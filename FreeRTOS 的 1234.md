@@ -2,8 +2,6 @@
 
 ------
 
-------
-
 ## FreeRTOS 简介
 
 FreeRTOS是一个免费的嵌入式实时操作系统，他有以下特点
@@ -94,3 +92,74 @@ stateDiagram
 
 ## FreeRTOS 移植
 
+### 移植步骤——《FreeRTOS 开发指南》第二章（目前没板子先不做实操）
+
+1. 添加 FreeRTOS 源码
+2. 添加 FreeRTOSConfig.h
+3. 修改 SYSTEM 文件，修改 SYSTEM 文件中的 sys.c、delay.c、usart.c
+4. 修改中断相关文件，修改 Systick 中断、SVC 中断、PendSV 中断
+5. 添加应用程序，验证移植是否正确
+
+------
+
+## FreeRTOS任务创建和删除
+
+### 任务创建和删除的 API 函数
+
+| API                 | 描述             |
+| ------------------- | ---------------- |
+| xTaskCreate()       | 动态方式创建任务 |
+| xTaskCreateStatic() | 静态方式创建任务 |
+| vTaskDelete()       | 删除任务         |
+
+### 任务创建和删除（动态方法）
+
+动态：任务的任务控制块以及任务的栈空间所需的内存是 FreeRTOS 系统从 FreeRTOS 管理的堆中分配
+
+```c++
+BaseType_t xTaskCreate {
+  	TaskFuction_t pxTaskCode,																	/* 指向任务函数的指针 */
+    const char* const pxName,																	/* 任务名字，最大长度 configMAX_TASK_NAME_LEN */
+    const configSTACK_DEPTH_TYPE usStackDepth,								/* 任务堆栈大小，以字为单位，1 字 = 4 字节 */
+    void* const pvParameters,																	/* 传递给任务函数的参数，一般为空 NULL */
+    UBaseType_t uxPriority,																		/* 任务优先级 */
+    TaskHandle_t* const pxCreatedTask													/* 任务句柄，就是任务的任务控制块
+}
+/*
+ * 返回值:
+ * pdPASS, 任务创建成功
+ * errCOULD_NOT_ALLOCATE_REQUIRED_MEMORY, 任务创建失败
+ */
+```
+
+#### 流程：
+
+1. 将宏 configSUPPORT_DYNAMIC_ALLOCATION 置为 1
+2. 定义函数入口参数
+3. 编写任务函数
+
+此函数创建的任务会立刻进入就绪态，由任务调度器调度运行
+
+#### 内部实现
+
+1. 申请堆栈内存 & 任务控制块内存
+2. TCB （任务控制块）结构体成员赋值
+3. 添加新任务到就绪任务中
+
+#### 任务控制块结构体成员
+
+```C++
+typedef struct tskTaskControlBlock {
+		volatile StackType_t *pxTopOfStack;													 /* 任务栈栈顶，必须为 TCB 的第一个成员 */
+		ListItem_t xStateListItem;																	 /* 任务状态列表 */
+  	ListItem_t xEventListItem;																	 /* 任务事件列表项 */
+  	UBaseType_t uxPriority;																			 /* 任务优先级 */
+  	StackType_t *pxStack；																				/* 任务栈起始地址 */
+    char pcTaskName[configMAX_TASK_NAME_LEN];										 /* 任务名字 */
+		...
+} tskPCB;
+```
+
+### 任务创建和删除（静态方法）
+
+静态：任务的任务控制块以及任务的栈空间所需的内存是用户分配
