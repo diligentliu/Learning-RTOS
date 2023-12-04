@@ -150,8 +150,8 @@ BaseType_t xTaskCreate (
 
 ```C++
 typedef struct tskTaskControlBlock {
-		volatile StackType_t *pxTopOfStack;													 /* 任务栈栈顶，必须为 TCB 的第一个成员 */
-		ListItem_t xStateListItem;																	 /* 任务状态列表 */
+	volatile StackType_t *pxTopOfStack;													 /* 任务栈栈顶，必须为 TCB 的第一个成员 */
+	ListItem_t xStateListItem;																	 /* 任务状态列表 */
   	ListItem_t xEventListItem;																	 /* 任务事件列表项 */
   	UBaseType_t uxPriority;																			 /* 任务优先级 */
   	StackType_t *pxStack；																				/* 任务栈起始地址 */
