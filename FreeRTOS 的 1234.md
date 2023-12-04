@@ -102,7 +102,7 @@ stateDiagram
 
 ------
 
-## FreeRTOS任务创建和删除
+## FreeRTOS任务创建和删除（待实操）
 
 ### 任务创建和删除的 API 函数
 
@@ -117,14 +117,14 @@ stateDiagram
 动态：任务的任务控制块以及任务的栈空间所需的内存是 FreeRTOS 系统从 FreeRTOS 管理的堆中分配
 
 ```c++
-BaseType_t xTaskCreate {
+BaseType_t xTaskCreate (
   	TaskFuction_t pxTaskCode,																	/* 指向任务函数的指针 */
     const char* const pxName,																	/* 任务名字，最大长度 configMAX_TASK_NAME_LEN */
     const configSTACK_DEPTH_TYPE usStackDepth,								/* 任务堆栈大小，以字为单位，1 字 = 4 字节 */
     void* const pvParameters,																	/* 传递给任务函数的参数，一般为空 NULL */
     UBaseType_t uxPriority,																		/* 任务优先级 */
     TaskHandle_t* const pxCreatedTask													/* 任务句柄，就是任务的任务控制块
-}
+)
 /*
  * 返回值:
  * pdPASS, 任务创建成功
@@ -163,3 +163,68 @@ typedef struct tskTaskControlBlock {
 ### 任务创建和删除（静态方法）
 
 静态：任务的任务控制块以及任务的栈空间所需的内存是用户分配
+
+```
+BaseType_t xTaskCreateStatic (
+  	TaskFuction_t pxTaskCode,																	/* 指向任务函数的指针 */
+    const char* const pcName,																	/* 任务名字，最大长度 configMAX_TASK_NAME_LEN */
+    const uint32_t ulStackDepth,															/* 任务堆栈大小，以字为单位，1 字 = 4 字节 */
+    void* const pvParameters,																	/* 传递给任务函数的参数，一般为空 NULL */
+    UBaseType_t uxPriority,																		/* 任务优先级 */
+    StackType_t* const puxStackBuffer,												/* 任务堆栈，一般为数组，由用户分配 */
+    StaticTask_t* const pxTaskBuffer													/* 任务控制块指针，由用户分配 */
+)
+/*
+ * 返回值:
+ * NULL, 用户没有提供相应的内存，任务创建失败
+ * 其他值，任务句柄
+ */
+```
+
+#### 流程
+
+1. 将宏 configSUPPORT_STATIC_ALLOCATION 置为 1
+2. 定义空闲任务（必）、定时器任务的任务堆栈（可选）及 TCB
+3. 实现两个接口函数vApplicationGetIdleTaskMemory()、vApplicationGetTimerTaskMemory()
+4. 定义函数入口参数
+5. 编写任务函数
+
+#### 内部实现
+
+1. TCB （任务控制块）结构体成员赋值
+2. 添加新任务到就绪任务中
+
+### 任务删除函数
+
+```
+/*
+ * xTaskToDelete 待删除任务的任务句柄
+ * 用于删除已被创建的任务
+ * 被删除的任务将从就绪态任务列表、阻塞态任务列表、挂起态任务列表和事件列表中删除
+ * 注意：
+ * 1. 当传入参数为 NULL，则代表删除任务自身
+ * 2. 空闲任务会负责释放被删除任务中由系统分配的内存（动态创建），但是由用户在任务删除前申请的内存（静态创建），则需要由用户在任务被删除前提前释放，否则将导致内存泄露
+ */
+void vTaskDelete(TaskHandle_t xTaskToDelete);
+```
+
+xTaskToDelete是待删除任务的任务句柄
+
+该函数用于删除已被创建的任务，被删除的任务将从就绪态任务列表、阻塞态任务列表、挂起态任务列表和事件列表中删除
+
+#### 注意：
+
+1. 当传入参数为 NULL，则代表删除任务自身
+2. 空闲任务会负责释放被删除任务中由系统分配的内存（动态创建），但是由用户在任务删除前申请的内存（静态创建），则需要由用户在任务被删除前提前释放，否则将导致内存泄露
+
+#### 流程
+
+1. 宏配置 INCLUDE_vTaskDelete 1
+2. 入口参数传入需要删除的任务句柄（NULL 代表删除本身）
+
+#### 内部实现
+
+1. 获取索要删除的任务的控制块
+2. 将被删除任务移除所在列表
+3. 判断所需要删除的任务，删除任务自身，需要先添加到等待删除列表，内存释放将在空闲任务执行；删除其他任务，释放内存，任务数量—；
+4. 更新下个任务的阻塞时间，以防被删除的任务是下一个阻塞超时的任务
